@@ -1,3 +1,4 @@
+import { createServer } from "http";
 import { Router } from "itty-router";
 import { InteractionResponseType, InteractionType, verifyKey } from "discord-interactions";
 import JsonResponse from "./core/JsonResponse.js";
@@ -27,7 +28,6 @@ router.post("/", async (request, env) => {
 
 router.all("*", () => new Response("Not Found.", { status: 404 }));
 
-// Create and start the server
 const startServer = async () => {
   const port = process.env.PORT || 3000;
   const env = {
@@ -35,11 +35,48 @@ const startServer = async () => {
     DISCORD_PUBLIC_KEY: process.env.DISCORD_PUBLIC_KEY,
   };
 
-  addEventListener("fetch", event => {
-    event.respondWith(router.handle(event.request, env));
+  const server = createServer((req, res) => {
+    const { method, url } = req;
+    if (method === "POST" && url === "/") {
+      let body = "";
+      req.on("data", chunk => {
+        body += chunk.toString();
+      });
+      req.on("end", async () => {
+        const message = JSON.parse(body);
+        switch (message.type) {
+          case InteractionType.PING:
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ type: InteractionResponseType.PONG }));
+            break;
+          case InteractionType.APPLICATION_COMMAND:
+            const response = await applicationComponentRouteHandler(message, env);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(response));
+            break;
+          case InteractionType.MESSAGE_COMPONENT:
+            const componentResponse = await messageComponentRouteHandler(message, env);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(componentResponse));
+            break;
+          default:
+            console.error("Unknown Type");
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Unknown Type" }));
+        }
+      });
+    } else if (method === "GET" && url === "/") {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end(`👋 ${env.DISCORD_APPLICATION_ID}`);
+    } else {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not Found.");
+    }
   });
 
-  console.log(`Server is running on port ${port}`);
+  server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
 };
 
 startServer();
