@@ -4,6 +4,18 @@ import { InteractionResponseType, InteractionType, verifyKey } from "discord-int
 import JsonResponse from "./core/JsonResponse.js";
 import { applicationComponentRouteHandler } from "./routes/applicationComponentRouteHandler.js";
 import { messageComponentRouteHandler } from "./routes/messageComponentRouteHandler.js";
+const { Client, GatewayIntentBits } = require('discord.js');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const token = process.env.DISCORD_TOKEN;
+
+client.once('ready', () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+});
+
+client.on('error', console.error);
+
+client.login(token);
 
 const router = Router();
 
